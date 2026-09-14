@@ -1,0 +1,18 @@
+# FareOrders configuration
+# Reloading is intentionally not implemented; restart after changing this file.
+
+orders:
+  max-active-per-player: 10
+  min-quantity: 1
+  max-quantity: 2304
+  min-price: 0.01
+  max-price: 1000000000000.0
+  expiration-seconds: 86400
+
+messages:
+  prefix: "&6FareOrders &8» "
+
+# The current implementation matches vanilla Material types exactly.
+# Custom ItemStack metadata matching can be added later without changing the economy flow.
+item-matching:
+  mode: material

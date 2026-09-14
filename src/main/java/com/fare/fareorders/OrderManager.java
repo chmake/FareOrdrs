@@ -11,11 +11,12 @@ public final class OrderManager {
     private final AtomicLong nextId = new AtomicLong(1);
     private final List<Order> orders = new ArrayList<>();
 
-    public Order createOrder(
+    public synchronized Order createOrder(
             UUID owner,
             String item,
             long amount,
-            double price
+            double price,
+            long expiration
     ) {
         if (owner == null) {
             throw new IllegalArgumentException("Owner cannot be null.");
@@ -33,19 +34,26 @@ public final class OrderManager {
             throw new IllegalArgumentException("Price cannot be negative.");
         }
 
+        long now = System.currentTimeMillis();
+        long expiresAt = expiration <= 0 ? 0 : now + expiration;
+
         Order order = new Order(
                 nextId.getAndIncrement(),
                 owner,
                 item,
                 amount,
-                price
+                price,
+                now,
+                expiresAt,
+                amount
         );
 
         orders.add(order);
+
         return order;
     }
 
-    public Order getOrder(long id) {
+    public synchronized Order getOrder(long id) {
         for (Order order : orders) {
             if (order.getId() == id) {
                 return order;
@@ -55,15 +63,23 @@ public final class OrderManager {
         return null;
     }
 
-    public boolean removeOrder(long id) {
-        return orders.removeIf(order -> order.getId() == id);
+    public synchronized List<Order> getOrders() {
+        return Collections.unmodifiableList(new ArrayList<>(orders));
     }
 
-    public List<Order> getOrders() {
-        return Collections.unmodifiableList(orders);
+    public synchronized List<Order> getActiveOrders() {
+        List<Order> result = new ArrayList<>();
+
+        for (Order order : orders) {
+            if (!order.isComplete() && !order.isExpired()) {
+                result.add(order);
+            }
+        }
+
+        return result;
     }
 
-    public List<Order> getOrders(UUID owner) {
+    public synchronized List<Order> getOrders(UUID owner) {
         List<Order> result = new ArrayList<>();
 
         for (Order order : orders) {
@@ -75,7 +91,57 @@ public final class OrderManager {
         return result;
     }
 
-    public long getNextId() {
+    public synchronized boolean cancelOrder(long id, UUID owner) {
+        Order order = getOrder(id);
+
+        if (order == null) {
+            return false;
+        }
+
+        if (!order.getOwner().equals(owner)) {
+            return false;
+        }
+
+        return orders.remove(order);
+    }
+
+    public synchronized long fulfill(Order order, long amount) {
+        if (order == null || amount <= 0) {
+            return 0;
+        }
+
+        if (order.isComplete() || order.isExpired()) {
+            return 0;
+        }
+
+        long fulfilled = Math.min(amount, order.getRemaining());
+
+        order.setRemaining(order.getRemaining() - fulfilled);
+
+        return fulfilled;
+    }
+
+    public synchronized long getPlayerOrderCount(UUID owner) {
+        long count = 0;
+
+        for (Order order : orders) {
+            if (order.getOwner().equals(owner) && !order.isComplete()) {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    public synchronized void removeExpiredOrders() {
+        orders.removeIf(Order::isExpired);
+    }
+
+    public synchronized long getNextId() {
         return nextId.get();
+    }
+
+    public synchronized void setNextId(long nextId) {
+        this.nextId.set(nextId);
     }
 }

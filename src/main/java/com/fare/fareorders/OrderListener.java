@@ -24,7 +24,12 @@ public final class OrderListener implements Listener {
         int slot=e.getRawSlot();
         if(slot<0||slot>=e.getView().getTopInventory().getSize())return;
         try{
-            switch(t){case GUI.MAIN->main(p,slot);case GUI.CREATE->create(p,slot);case GUI.ITEMS->items(p,slot);case GUI.BROWSE->browse(p,slot);case GUI.MINE->mine(p,slot);case GUI.DETAIL->detail(p,slot);default->{}}
+            if(GUI.MAIN.equals(t))main(p,slot);
+            else if(GUI.CREATE.equals(t))create(p,slot);
+            else if(GUI.ITEMS.equals(t))items(p,slot);
+            else if(GUI.BROWSE.equals(t))browse(p,slot);
+            else if(GUI.MINE.equals(t))mine(p,slot);
+            else if(GUI.DETAIL.equals(t))detail(p,slot);
         }catch(Exception ex){plugin.getLogger().warning("GUI action failed: "+ex.getMessage());p.sendMessage(ChatColor.RED+"FareOrders » "+ex.getMessage());}
     }
     private void main(Player p,int s){
@@ -49,7 +54,7 @@ public final class OrderListener implements Listener {
         if(s==49){x.setInput(OrderSession.Input.SEARCH);p.closeInventory();p.sendMessage(ChatColor.AQUA+"FareOrders » Enter an item name, or type cancel to clear the search.");return;}
         if(s>=0&&s<45){ItemStack item=p.getOpenInventory().getTopInventory().getItem(s);if(item!=null&&!item.getType().isAir()&&item.getType()!=org.bukkit.Material.GRAY_STAINED_GLASS_PANE){x.setMaterial(item.getType());x.setStage(OrderSession.Stage.ENTER_AMOUNT);x.setFilter("");x.setItemPage(0);plugin.getGui().openCreateOrder(p);}}
     }
-    private void browse(Player p,int s){
+    private void browse(Player p,int s)throws Exception{
         OrderSession x=session(p);List<Order> list=plugin.getOrderManager().active();int page=x.getBrowsePage();
         if(s==45){plugin.getGui().openBrowse(p,Math.max(0,page-1));return;}if(s==53){plugin.getGui().openBrowse(p,page+1);return;}if(s==49){plugin.getGui().openMainMenu(p);return;}
         if(s<45){int index=page*45+s;if(index<list.size()){Order o=list.get(index);plugin.getOrderService().expireIfNeeded(o);plugin.getGui().openOrderDetails(p,o);}}
@@ -74,12 +79,12 @@ public final class OrderListener implements Listener {
     @EventHandler public void onDrag(InventoryDragEvent e){if(isMenu(e.getView().getTitle()))e.setCancelled(true);}
     @EventHandler public void onChat(AsyncChatEvent e){Player p=e.getPlayer();OrderSession x=plugin.getOrderSession(p.getUniqueId());if(x==null||x.getInput()==OrderSession.Input.NONE)return;e.setCancelled(true);String text=PlainTextComponentSerializer.plainText().serialize(e.message()).trim();plugin.getServer().getScheduler().runTask(plugin,()->input(p,x,text));}
     private void input(Player p,OrderSession x,String text){
-        if(text.equalsIgnoreCase("cancel")){x.setInput(OrderSession.Input.NONE);if(x.getInput()==OrderSession.Input.SEARCH)x.setFilter("");plugin.getGui().openCreateOrder(p);return;}
-        try{switch(x.getInput()){
-            case SEARCH->{x.setFilter(text.toLowerCase(Locale.ROOT));x.setItemPage(0);x.setInput(OrderSession.Input.NONE);plugin.getGui().openItemSelector(p,0,x.getFilter());}
-            case AMOUNT->{long n=Long.parseLong(text);if(n<=0)throw new IllegalArgumentException("Quantity must be positive.");x.setAmount(n);x.setInput(OrderSession.Input.NONE);x.setStage(OrderSession.Stage.ENTER_PRICE);plugin.getGui().openCreateOrder(p);}
-            case PRICE->{double n=Double.parseDouble(text);if(!Double.isFinite(n)||n<=0)throw new IllegalArgumentException("Price must be positive.");x.setPrice(n);x.setInput(OrderSession.Input.NONE);x.setStage(OrderSession.Stage.CONFIRM);plugin.getGui().openCreateOrder(p);}
-            default->{}}
+        OrderSession.Input input=x.getInput();
+        if(text.equalsIgnoreCase("cancel")){x.setInput(OrderSession.Input.NONE);x.setFilter("");plugin.getGui().openCreateOrder(p);return;}
+        try{
+            if(input==OrderSession.Input.SEARCH){x.setFilter(text.toLowerCase(Locale.ROOT));x.setItemPage(0);x.setInput(OrderSession.Input.NONE);plugin.getGui().openItemSelector(p,0,x.getFilter());}
+            else if(input==OrderSession.Input.AMOUNT){long n=Long.parseLong(text);if(n<=0)throw new IllegalArgumentException("Quantity must be positive.");x.setAmount(n);x.setInput(OrderSession.Input.NONE);x.setStage(OrderSession.Stage.ENTER_PRICE);plugin.getGui().openCreateOrder(p);}
+            else if(input==OrderSession.Input.PRICE){double n=Double.parseDouble(text);if(!Double.isFinite(n)||n<=0)throw new IllegalArgumentException("Price must be positive.");x.setPrice(n);x.setInput(OrderSession.Input.NONE);x.setStage(OrderSession.Stage.CONFIRM);plugin.getGui().openCreateOrder(p);}
         }catch(NumberFormatException ex){p.sendMessage(ChatColor.RED+"FareOrders » Invalid number. Try again or type cancel.");}catch(Exception ex){p.sendMessage(ChatColor.RED+"FareOrders » "+ex.getMessage());}
     }
     private OrderSession session(Player p){OrderSession x=plugin.getOrderSession(p.getUniqueId());return x==null?plugin.createOrderSession(p.getUniqueId()):x;}

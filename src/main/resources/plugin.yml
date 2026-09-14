@@ -1,0 +1,21 @@
+name: FareOrders
+version: 1.0.0
+main: com.fare.fareorders.FareOrders
+api-version: '1.21'
+description: Lightweight and configurable player order marketplace.
+authors:
+  - Fare
+
+softdepend:
+  - Vault
+
+commands:
+  orders:
+    description: Open the FareOrders marketplace.
+    usage: /orders
+    permission: fareorders.use
+
+permissions:
+  fareorders.use:
+    description: Allows the player to use /orders.
+    default: true

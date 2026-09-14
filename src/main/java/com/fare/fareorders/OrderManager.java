@@ -1,147 +1,65 @@
 package com.fare.fareorders;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import org.bukkit.Material;
+import java.sql.SQLException;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class OrderManager {
-
+    private final FareOrders plugin;
+    private final Map<Long, Order> orders = new LinkedHashMap<>();
     private final AtomicLong nextId = new AtomicLong(1);
-    private final List<Order> orders = new ArrayList<>();
 
-    public synchronized Order createOrder(
-            UUID owner,
-            String item,
-            long amount,
-            double price,
-            long expiration
-    ) {
-        if (owner == null) {
-            throw new IllegalArgumentException("Owner cannot be null.");
-        }
+    public OrderManager(FareOrders plugin) { this.plugin = plugin; }
 
-        if (item == null || item.isBlank()) {
-            throw new IllegalArgumentException("Item cannot be empty.");
-        }
+    public synchronized void load() throws SQLException {
+        orders.clear();
+        for (Order order : plugin.getDatabase().getAllOrders()) orders.put(order.getId(), order);
+        nextId.set(Math.max(1, plugin.getDatabase().maxId() + 1));
+    }
 
-        if (amount <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than zero.");
-        }
+    public synchronized Order get(long id) { return orders.get(id); }
 
-        if (price < 0) {
-            throw new IllegalArgumentException("Price cannot be negative.");
-        }
+    public synchronized List<Order> active() {
+        List<Order> result = new ArrayList<>();
+        for (Order order : orders.values()) if (!order.isComplete() && !order.isExpired()) result.add(order);
+        return result;
+    }
 
+    public synchronized List<Order> byOwner(UUID owner) {
+        List<Order> result = new ArrayList<>();
+        for (Order order : orders.values()) if (order.getOwner().equals(owner)) result.add(order);
+        return result;
+    }
+
+    public synchronized long activeCount(UUID owner) {
+        return byOwner(owner).stream().filter(o -> !o.isComplete() && !o.isExpired()).count();
+    }
+
+    public synchronized Order create(UUID owner, Material material, long amount, double price, long expirationMs) throws SQLException {
+        long id = nextId.getAndIncrement();
         long now = System.currentTimeMillis();
-        long expiresAt = expiration <= 0 ? 0 : now + expiration;
-
-        Order order = new Order(
-                nextId.getAndIncrement(),
-                owner,
-                item,
-                amount,
-                price,
-                now,
-                expiresAt,
-                amount
-        );
-
-        orders.add(order);
-
+        long expires = expirationMs <= 0 ? 0 : now + expirationMs;
+        Order order = new Order(id, owner, material, amount, price, now, expires, amount, 0);
+        plugin.getDatabase().insertOrder(order);
+        orders.put(id, order);
         return order;
     }
 
-    public synchronized Order getOrder(long id) {
-        for (Order order : orders) {
-            if (order.getId() == id) {
-                return order;
-            }
-        }
-
-        return null;
+    public synchronized long fulfill(Order order, long amount) throws SQLException {
+        if (order == null || amount <= 0 || order.isComplete() || order.isExpired()) return 0;
+        long delivered = Math.min(amount, order.getRemaining());
+        order.setRemaining(order.getRemaining() - delivered);
+        order.addDelivered(delivered);
+        plugin.getDatabase().updateOrder(order);
+        return delivered;
     }
 
-    public synchronized List<Order> getOrders() {
-        return Collections.unmodifiableList(new ArrayList<>(orders));
-    }
+    public synchronized void save(Order order) throws SQLException { plugin.getDatabase().updateOrder(order); }
 
-    public synchronized List<Order> getActiveOrders() {
-        List<Order> result = new ArrayList<>();
-
-        for (Order order : orders) {
-            if (!order.isComplete() && !order.isExpired()) {
-                result.add(order);
-            }
-        }
-
-        return result;
-    }
-
-    public synchronized List<Order> getOrders(UUID owner) {
-        List<Order> result = new ArrayList<>();
-
-        for (Order order : orders) {
-            if (order.getOwner().equals(owner)) {
-                result.add(order);
-            }
-        }
-
-        return result;
-    }
-
-    public synchronized boolean cancelOrder(long id, UUID owner) {
-        Order order = getOrder(id);
-
-        if (order == null) {
-            return false;
-        }
-
-        if (!order.getOwner().equals(owner)) {
-            return false;
-        }
-
-        return orders.remove(order);
-    }
-
-    public synchronized long fulfill(Order order, long amount) {
-        if (order == null || amount <= 0) {
-            return 0;
-        }
-
-        if (order.isComplete() || order.isExpired()) {
-            return 0;
-        }
-
-        long fulfilled = Math.min(amount, order.getRemaining());
-
-        order.setRemaining(order.getRemaining() - fulfilled);
-
-        return fulfilled;
-    }
-
-    public synchronized long getPlayerOrderCount(UUID owner) {
-        long count = 0;
-
-        for (Order order : orders) {
-            if (order.getOwner().equals(owner) && !order.isComplete()) {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
-    public synchronized void removeExpiredOrders() {
-        orders.removeIf(Order::isExpired);
-    }
-
-    public synchronized long getNextId() {
-        return nextId.get();
-    }
-
-    public synchronized void setNextId(long nextId) {
-        this.nextId.set(nextId);
+    public synchronized void delete(Order order) throws SQLException {
+        if (order == null) return;
+        plugin.getDatabase().deleteOrder(order.getId());
+        orders.remove(order.getId());
     }
 }

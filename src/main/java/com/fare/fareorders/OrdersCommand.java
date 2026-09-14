@@ -25,8 +25,7 @@ public final class OrdersCommand implements CommandExecutor {
             return true;
         }
 
-        player.sendMessage("§6FareOrders §8» §fOrders menu coming soon.");
-
+        plugin.getGui().openMainMenu(player);
         return true;
     }
 }

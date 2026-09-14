@@ -55,6 +55,48 @@ public final class GUI {
         player.openInventory(inventory);
     }
 
+    public void openCreateOrder(Player player) {
+        Inventory inventory = Bukkit.createInventory(
+                null,
+                54,
+                ChatColor.DARK_GREEN + "Create Order"
+        );
+
+        fillBackground(inventory);
+
+        inventory.setItem(20, createItem(
+                Material.DIAMOND,
+                ChatColor.AQUA + "Select Item",
+                ChatColor.GRAY + "Choose the item you want."
+        ));
+
+        inventory.setItem(22, createItem(
+                Material.PAPER,
+                ChatColor.YELLOW + "Quantity",
+                ChatColor.GRAY + "Set how many items you need."
+        ));
+
+        inventory.setItem(24, createItem(
+                Material.EMERALD,
+                ChatColor.GREEN + "Price",
+                ChatColor.GRAY + "Set the price per item."
+        ));
+
+        inventory.setItem(40, createItem(
+                Material.LIME_DYE,
+                ChatColor.GREEN + "Confirm Order",
+                ChatColor.GRAY + "Create the order."
+        ));
+
+        inventory.setItem(49, createItem(
+                Material.BARRIER,
+                ChatColor.RED + "Cancel",
+                ChatColor.GRAY + "Cancel order creation."
+        ));
+
+        player.openInventory(inventory);
+    }
+
     private void fillBackground(Inventory inventory) {
         ItemStack filler = createItem(
                 Material.GRAY_STAINED_GLASS_PANE,
@@ -92,7 +134,6 @@ public final class GUI {
         }
 
         item.setItemMeta(meta);
-
         return item;
     }
 }

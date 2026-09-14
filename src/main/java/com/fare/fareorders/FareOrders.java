@@ -1,20 +1,44 @@
 package com.fare.fareorders;
 
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class FareOrders extends JavaPlugin {
 
     private static FareOrders instance;
+
     private OrderManager orderManager;
+    private Database database;
+    private EconomyManager economyManager;
 
     @Override
     public void onEnable() {
         instance = this;
 
-        orderManager = new OrderManager();
+        saveDefaultConfig();
 
-        if (getCommand("orders") != null) {
-            getCommand("orders").setExecutor(new OrdersCommand(this));
+        orderManager = new OrderManager();
+        database = new Database(this);
+        economyManager = new EconomyManager(this);
+
+        try {
+            database.connect();
+        } catch (Exception exception) {
+            getLogger().severe("Failed to connect to SQLite.");
+            exception.printStackTrace();
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
+        if (!economyManager.setup()) {
+            getLogger().warning("No economy provider detected.");
+            getLogger().warning("Money-related features will be unavailable.");
+        }
+
+        PluginCommand ordersCommand = getCommand("orders");
+
+        if (ordersCommand != null) {
+            ordersCommand.setExecutor(new OrdersCommand(this));
         }
 
         getLogger().info("FareOrders enabled.");
@@ -22,8 +46,13 @@ public final class FareOrders extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        getLogger().info("FareOrders disabled.");
+        if (database != null) {
+            database.close();
+        }
+
         instance = null;
+
+        getLogger().info("FareOrders disabled.");
     }
 
     public static FareOrders getInstance() {
@@ -32,5 +61,13 @@ public final class FareOrders extends JavaPlugin {
 
     public OrderManager getOrderManager() {
         return orderManager;
+    }
+
+    public Database getDatabase() {
+        return database;
+    }
+
+    public EconomyManager getEconomyManager() {
+        return economyManager;
     }
 }

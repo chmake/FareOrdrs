@@ -9,6 +9,9 @@ public final class Order {
     private final String item;
     private final long amount;
     private final double price;
+    private final long createdAt;
+    private final long expiresAt;
+
     private long remaining;
 
     public Order(
@@ -16,14 +19,19 @@ public final class Order {
             UUID owner,
             String item,
             long amount,
-            double price
+            double price,
+            long createdAt,
+            long expiresAt,
+            long remaining
     ) {
         this.id = id;
         this.owner = owner;
         this.item = item;
         this.amount = amount;
         this.price = price;
-        this.remaining = amount;
+        this.createdAt = createdAt;
+        this.expiresAt = expiresAt;
+        this.remaining = remaining;
     }
 
     public long getId() {
@@ -46,6 +54,14 @@ public final class Order {
         return price;
     }
 
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public long getExpiresAt() {
+        return expiresAt;
+    }
+
     public long getRemaining() {
         return remaining;
     }
@@ -54,7 +70,19 @@ public final class Order {
         this.remaining = remaining;
     }
 
+    public long getFulfilled() {
+        return amount - remaining;
+    }
+
+    public double getRemainingValue() {
+        return remaining * price;
+    }
+
     public boolean isComplete() {
         return remaining <= 0;
+    }
+
+    public boolean isExpired() {
+        return expiresAt > 0 && System.currentTimeMillis() >= expiresAt;
     }
 }
